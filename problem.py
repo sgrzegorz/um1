@@ -99,9 +99,9 @@ class Car:
 
     def drive(self):
         if self.last_penalty is not None:
-            action = self.driver.control(self.state(), self.last_penalty)
+            action = self.driver.control(self.state(), self.last_penalty) # tutaj wchodzę na początku każdego epizodu i tylko raz
         else:
-            action = self.driver.start_attempt(self.state())
+            action = self.driver.start_attempt(self.state()) # wpp jestem tutaj
         if self.last_penalty == 0:
             self.v_x, self.v_y = 0, 0
             action = Action(0, 0)
@@ -151,7 +151,7 @@ class Experiment:
     driver: Driver
     number_of_episodes: int
     current_episode_no: int = 0
-    penalties: Optional[list] = None  # TODO: tutaj będą się gromadzić kary przyznane w kolejnych epizodach
+    penalties: Optional[list] = None  # LOOK HERE: tutaj będą się gromadzić kary przyznane w kolejnych epizodach
 
     def run(self) -> None:
         self.penalties = []
