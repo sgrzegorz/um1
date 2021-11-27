@@ -5,7 +5,7 @@ import random
 import numpy as np
 import sklearn.preprocessing as skl_preprocessing
 
-from problem import Action, available_actions, Corner, Driver, Experiment, Environment, State
+from problem import Action, available_actions, Corner, Driver, Experiment, Environment, State, DRAWING_FREQUENCY
 
 ALMOST_INFINITE_STEP = 100000
 MAX_LEARNING_STEPS = 500
@@ -67,20 +67,21 @@ class OffPolicyNStepSarsaDriver(Driver):
         if update_step >= 0: #tau
             return_value_weight = self._return_value_weight(update_step) #p
             return_value = self._return_value(update_step)  #G
+
+            if(update_step+self.step_no)<self.final_step:
+                return_value = return_value + pow(self.discount_factor,self.step_no)* self.q[update_step+self.step_no, update_step+self.step_no]
             state_t = self.states[self._access_index(update_step)]
             action_t = self.actions[self._access_index(update_step)]
 
-            a=9
-            self.q[state_t, action_t] = self.q[state_t, action_t] + self.experiment_rate*return_value_weight*(return_value - self.q[state_t, action_t]) # TODO: Tutaj trzeba zaktualizować tablicę wartościującą akcje Q
+            self.q[state_t, action_t] = self.q[state_t, action_t] + self.step_size*return_value_weight*(return_value - self.q[state_t, action_t]) # TODO: Tutaj trzeba zaktualizować tablicę wartościującą akcje Q
 
-            a=9
         if update_step == self.final_step - 1:
             self.finished = True
 
         self.current_step += 1
         return action
 
-    def _return_value(self, update_step)-> float:
+    def _return_value(self, update_step)-> float: # G
         return_value = 0.0
         i=update_step+1
         while(i<=min(update_step+self.step_no,self.final_step)):
@@ -94,14 +95,16 @@ class OffPolicyNStepSarsaDriver(Driver):
         return_value_weight = 1.0
         # TODO: Tutaj trzeba policzyć korektę na różne prawdopodobieństwa ρ (ponieważ uczymy poza-polityką)
         i = update_step + 1
-        while (i <= min(update_step + self.step_no - 1, self.final_step-1)):
+        while (i <= min(update_step + self.step_no, self.final_step-1)):
             state_i = self.states[self._access_index(i)]
             action_i = self.actions[self._access_index(i)]
 
-            p_pi = list(self.greedy_policy(state_i, [action_i]).values())[0]
-            p_b =list(self.epsilon_greedy_policy(state_i, [action_i]).values())[0]
+            # p_pi = self.greedy_policy(state_i, [action_i])[action_i]
+            # p_b =self.epsilon_greedy_policy(state_i, [action_i])[action_i]
+
+            p_pi = self.greedy_policy(state_i, available_actions(state_i))[action_i]
+            p_b =self.epsilon_greedy_policy(state_i, available_actions(state_i))[action_i]
             return_value_weight *=p_pi/p_b
-            # return_value_weight*=self.greedy_policy(state_i,list(action_i))[action_i]/self.epsilon_greedy_policy(state_i,list(action_i))[action_i]
             i += 1
         return return_value_weight
 
@@ -119,15 +122,15 @@ class OffPolicyNStepSarsaDriver(Driver):
         return actions[i]
 
     def epsilon_greedy_policy(self, state: State, actions: list[Action]) -> dict[Action, float]:
-        # probabilities = self._random_probabilities(actions)  # TODO: tutaj trzeba ustalic prawdopodobieństwa wyboru akcji według polityki ε-zachłannej
+        # TODO: tutaj trzeba ustalic prawdopodobieństwa wyboru akcji według polityki ε-zachłannej
         #str 32 RLBook 2020
         rand= random.random()
-        if(rand< self.experiment_rate): #probability epsilon # rand <0.05
-            probabilities = self._random_probabilities(actions)
-
-        else:  #probability 1 − epsilon  # rand >= 0.05
-            probabilities = self._greedy_probabilities(state, actions)
-        # probabilities = (1.0 - self.experiment_rate) * self._greedy_probabilities(state, actions) + self.experiment_rate * self._random_probabilities(actions)
+        # if(rand< self.experiment_rate): #probability epsilon # rand <0.05
+        #     probabilities = self._random_probabilities(actions)
+        #
+        # else:  #probability 1 − epsilon  # rand >= 0.05
+        #     probabilities = self._greedy_probabilities(state, actions)
+        probabilities = (1.0 - self.experiment_rate) * self._greedy_probabilities(state, actions) + self.experiment_rate * self._random_probabilities(actions)
 
 
         return {action: probability for action, probability in zip(actions, probabilities)}
@@ -152,22 +155,6 @@ class OffPolicyNStepSarsaDriver(Driver):
 
 
 def main() -> None:
-    # experiment = Experiment(
-    #     environment=Environment(
-    #         corner=Corner(
-    #             name='corner_b'
-    #         ),
-    #         steering_fail_chance=0.01,
-    #     ),
-    #     driver=RandomDriver(),
-    #     number_of_episodes=100,
-    # )
-    driver1 =  OffPolicyNStepSarsaDriver(
-            step_no=2,
-            step_size=0.3,
-            experiment_rate=0.3, #alpha
-            discount_factor=1.00, ##gamma
-        )
 
     experiment = Experiment(
         environment=Environment(
@@ -176,7 +163,12 @@ def main() -> None:
             ),
             steering_fail_chance=0.01,
         ),
-        driver=driver1,
+        driver=OffPolicyNStepSarsaDriver(
+            step_no=5,
+            step_size=0.3,
+            experiment_rate=0.3, #alpha
+            discount_factor=1.00, ##gamma
+        ),
         number_of_episodes=10000,
     )
 
