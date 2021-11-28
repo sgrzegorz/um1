@@ -68,8 +68,6 @@ class OffPolicyNStepSarsaDriver(Driver):
             return_value_weight = self._return_value_weight(update_step) #p
             return_value = self._return_value(update_step)  #G
 
-            if(update_step+self.step_no)<self.final_step:
-                return_value = return_value + pow(self.discount_factor,self.step_no)* self.q[update_step+self.step_no, update_step+self.step_no]
             state_t = self.states[self._access_index(update_step)]
             action_t = self.actions[self._access_index(update_step)]
 
@@ -81,21 +79,25 @@ class OffPolicyNStepSarsaDriver(Driver):
         self.current_step += 1
         return action
 
-    def _return_value(self, update_step)-> float: # G
+    def _return_value(self, update_step)-> float: # TODO: Tutaj trzeba policzyć zwrot G
         return_value = 0.0
         i=update_step+1
-        while(i<=min(update_step+self.step_no,self.final_step)):
+        while(i<=min(update_step+self.step_no-1,self.final_step-1)):
             return_value+=pow(self.discount_factor,i-update_step-1)*self.rewards[self._access_index(i)]
             i+=1
-        # TODO: Tutaj trzeba policzyć zwrot G
+
+        if(update_step+self.step_no)<self.final_step:
+            state_t = self.states[self._access_index(update_step+self.step_no)]
+            action_t = self.actions[self._access_index(update_step+self.step_no)]
+            return_value +=  pow(self.discount_factor,self.step_no)* self.q[state_t, action_t]
 
         return return_value
 
-    def _return_value_weight(self, update_step) -> float:
+    def _return_value_weight(self, update_step) -> float: #p
         return_value_weight = 1.0
         # TODO: Tutaj trzeba policzyć korektę na różne prawdopodobieństwa ρ (ponieważ uczymy poza-polityką)
         i = update_step + 1
-        while (i <= min(update_step + self.step_no, self.final_step-1)):
+        while (i <= min(update_step + self.step_no-1, self.final_step-1)):
             state_i = self.states[self._access_index(i)]
             action_i = self.actions[self._access_index(i)]
 
